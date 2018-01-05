@@ -48,7 +48,7 @@ We are developing client libraries to simplify the process of using Datamix. Cur
 
 ```javascript
 //jQuery example
-data = { "key": "<your_api_key>", "secret": "<you_api_secret>" }
+data = { "key": "<your_api_key>" }
 
 $.post("/sessions", function(data, status) {
   let system = data["system"] // The target system
@@ -61,14 +61,14 @@ $.post("/sessions", function(data, status) {
 });
 ```
 
-> Make sure to replace `<your_api_key>` and `<you_api_secret>` with your API key and secret.
+> Make sure to replace `<your_api_key>` with your API key.
 
 Datamix uses API keys to allow access to the API. You have to get someone to share the current API key with you for the given system, application and environment.
 
 Posting logs requires the use of the session token. Typically logging sessions are good for an hour, you should renew the session (by creating a new one) before your existing one expires.
 
 <aside class="warning">
-Never share or expose your API keys with those outside the organisation. They are intended to be used server-side only.
+Never share or expose your API keys with those outside the organization. They are intended to be used server-side only.
 </aside>
 
 <aside class="notice">
@@ -79,7 +79,7 @@ API Keys will typically also have an expiration. You'll need to configure new ke
 
 ```javascript
 //jQuery example
-data = {
+var log_data = {
   "session": session_token,
   "messages": [
     {
@@ -97,7 +97,7 @@ data = {
 
 destination = system + "." + application + "." + environment
 
-$.post("/destinations/" + destination + "/logs", function(data, status) {
+var callback = function(data, status) {
   let system = data["system"] // The target system
   let application = data["application"] // The target application
   let environment = data["environment"] // The target environment
@@ -109,13 +109,22 @@ $.post("/destinations/" + destination + "/logs", function(data, status) {
     var index = rejected[i]["index"] // The index of the rejected log
     var message = rejected[i]["message"] // The reason for the rejection.
   }
-});
+
+  // There are better ways to do this, but if you have more logs:
+  next_logs = get_next_logs() // implemented elsewhere ...
+  // Note the session will have changed, you must use the new token
+  next_logs["session"] = data["session"]
+  $.post("/destinations/" + destination + "/logs", next_logs, callback);
+}
+
+$.post("/destinations/" + destination + "/logs", log_data, callback);
 ```
 
 > An example JSON returned by the logs endpoint:
 
 ```json
 {
+  "session": "signed-session-string-here",
   "system": "batch",
   "application": "publisher",
   "environment": "staging",
@@ -138,6 +147,10 @@ Logs one or more messages to the backend. Besides being a valid JSON format, the
 Non-rejected logs were already sent to the logging backend. Retrying rejected logs will not resolve the issue since they are invalid. Resending non-rejected logs again will cause duplicate log entries.
 </aside>
 
+<aside class="warning">
+The logs response will return a new session token. You **must** use this new token on the next request or the logs may be dropped. The signed session token may contain state information necessary to correctly pass messages to the backend systems. This implies a single session can only support a single request at a time. Do not make parallel requests with the same session.
+</aside>
+
 There is not currently a log message size limit. However, large log messages may be split into multiple messages on the backend before reaching their final destination. The theoretical maximum sustained log throughput is about 5 MB/s. If you are even coming close to that, you'll need to split your logs across multiple sessions.
 
 # HTTP Request Specification
@@ -150,15 +163,13 @@ There is not currently a log message size limit. However, large log messages may
 
 ```json
 {
-  "key": <api_key:string>,
-  "secret": <secret:string>
+  "key": <api_key:string>
 }
 ```
 
 Parameter | Description
 --------- | -----------
 key | The API key. You must pass the correct API key for your system, application and environment.
-secret | The secret value that matches your API key
 
 <aside class="success">
 Either query parameters or JSON content are acceptable
