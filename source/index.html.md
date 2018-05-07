@@ -84,12 +84,12 @@ var log_data = {
   "messages": [
     {
       "level": "info",
-      "timestamp": new Date().now(),
+      "timestamp": Date.now(),
       "message": "This is a simple info message"
     },
     {
       "level": "warn",
-      "timestamp": new Date().now(),
+      "timestamp": Date.now(),
       "message": "This is a simple warning message"
     }
   ]
